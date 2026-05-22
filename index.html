@@ -461,34 +461,37 @@ async function exportSinglePDF(index){
         
 // MATRIX NILAI MANAGEMENT
 
-doc.setFillColor(20,30,50);
-doc.roundedRect(w-92,48,70,38,3,3,'F');
+var matrixX = w - 82;
+var matrixY = 52;
 
-var legendY = 56;
+doc.setFillColor(10,15,30);
+doc.roundedRect(matrixX,matrixY,58,32,2,2,'F');
 
-function drawLegend(letter,desc,color,textColor){
-    doc.setFillColor(color[0],color[1],color[2]);
-    doc.rect(w-88,legendY,16,6,'F');
+function drawLegend(y,label,text,bg,textColor){
 
+    // BOX NILAI
+    doc.setFillColor(bg[0],bg[1],bg[2]);
+    doc.rect(matrixX+3,y,10,5,'F');
+
+    // HURUF
     doc.setTextColor(textColor[0],textColor[1],textColor[2]);
-    doc.setFontSize(9);
     doc.setFont("helvetica","bold");
-    doc.text(letter,w-80,legendY+4,{align:"center"});
+    doc.setFontSize(8);
+    doc.text(label,matrixX+8,y+3.5,{align:"center"});
 
-    doc.setFillColor(30,41,59);
-    doc.rect(w-72,legendY,44,6,'F');
-
+    // TEXT
     doc.setTextColor(255,255,255);
-    doc.setFontSize(7);
-    doc.text(desc,w-70,legendY+4);
-
-    legendY += 8;
+    doc.setFontSize(6.5);
+    doc.text(text,matrixX+16,y+3.5);
 }
 
-drawLegend("A","SANGAT BAIK",[22,163,74],[255,255,255]);
-drawLegend("B","BAIK",[234,179,8],[0,0,0]);
-drawLegend("C","CUKUP",[56,189,248],[255,255,255]);
-drawLegend("D","BURUK",[239,68,68],[255,255,255]);
+drawLegend(matrixY+4,"A","SANGAT BAIK",[22,163,74],[255,255,255]);
+
+drawLegend(matrixY+11,"B","BAIK",[234,179,8],[0,0,0]);
+
+drawLegend(matrixY+18,"C","CUKUP",[56,189,248],[255,255,255]);
+
+drawLegend(matrixY+25,"D","BURUK",[239,68,68],[255,255,255]);
 
         // Data Personel
         doc.setFillColor(30,41,59); doc.rect(left-3,y-4,contentWidth+6,38,'F');
