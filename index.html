@@ -11,6 +11,59 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
+
+.grade-legend-box{
+    position:absolute;
+    top:58px;
+    right:20px;
+    width:300px;
+    background:rgba(15,23,42,0.95);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:10px;
+    padding:10px;
+}
+
+.grade-row{
+    display:flex;
+    align-items:center;
+    margin-bottom:8px;
+    border-radius:6px;
+    overflow:hidden;
+    font-size:11px;
+    font-weight:bold;
+}
+
+.grade-letter{
+    width:45px;
+    text-align:center;
+    padding:8px;
+    color:#fff;
+}
+
+.grade-desc{
+    flex:1;
+    padding:8px 10px;
+    background:#1e293b;
+    color:#fff;
+}
+
+.grade-a{
+    background:#16a34a;
+}
+
+.grade-b{
+    background:#eab308;
+    color:#000;
+}
+
+.grade-c{
+    background:#38bdf8;
+}
+
+.grade-d{
+    background:#ef4444;
+}
+
 *{box-sizing:border-box;}
 body{font-family:Segoe UI, system-ui;background:#0b1220;color:#e5e7eb;margin:0;padding:0;}
 body.light-mode{background:#f0f2f5;color:#1a1a2e;}
@@ -140,12 +193,25 @@ canvas{touch-action:manipulation;max-width:100%;height:auto;}
             </div>
             <div class="card">
                 <input id="name" placeholder="Nama Personel">
-                <select id="periodSelect" onchange="togglePeriodSpecificFields()">
-                    <option value="">Pilih Periode Evaluasi</option>
-                    <option value="3 Bulan">Evaluasi 3 Bulan (Probation)</option>
-                    <option value="6 Bulan">Evaluasi 6 Bulan (Kontrak)</option>
-                    <option value="12 Bulan">Evaluasi 12 Bulan (Tetap/Promosi)</option>
-                </select>
+               <select id="periodSelect" onchange="togglePeriodSpecificFields()">
+    <option value="">Pilih Periode Evaluasi</option>
+
+    <option value="1 Bulan">
+        Evaluasi 1 Bulan (Masa Adaptasi)
+    </option>
+
+    <option value="3 Bulan">
+        Evaluasi 3 Bulan (Probation)
+    </option>
+
+    <option value="6 Bulan">
+        Evaluasi 6 Bulan (Kontrak)
+    </option>
+
+    <option value="12 Bulan">
+        Evaluasi 12 Bulan (Tetap / Promosi)
+    </option>
+</select>
                 <input id="location" placeholder="Lokasi Penilaian">
                 <input id="assessorName" placeholder="Nama Danru/Penilai">
             </div>
@@ -201,6 +267,9 @@ canvas{touch-action:manipulation;max-width:100%;height:auto;}
 <div id="progressModal" class="modal hidden"><div class="modal-content"><h3>PROGRESS TRACKING</h3><div id="progressInfo"></div><canvas id="progressChart" width="500" height="300"></canvas><button onclick="closeProgress()">Tutup</button></div></div>
 
 <script>
+
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyrlHI6w57OVwmdaCE_LutgCeClXv2cpPP2Pm6il_tBOR4rZ0CmbrUzfkuWrOF1TjQSuw/exec";
+
 // ==================== INDIKATOR LENGKAP ====================
 var originalIndicators = [
     { name: "Discipline and Attendance", points: [
@@ -293,7 +362,67 @@ function filterPersonel() { var search=document.getElementById("searchInput").va
 function renderList() { filterPersonel(); }
 function renderRank() { var r=document.getElementById("rankBox"); if(!r) return; var sorted=db.slice(); sorted.sort(function(a,b){return (b.history[b.history.length-1]?b.history[b.history.length-1].total:0) - (a.history[a.history.length-1]?a.history[a.history.length-1].total:0);}); var html="<b>RANKING (Top 5)</b><br>"; for(var i=0;i<Math.min(5,sorted.length);i++){ var l=sorted[i].history[sorted[i].history.length-1]; if(l) html+=(i+1)+". "+escapeHtml(sorted[i].name)+" - "+l.total+"/"+l.maxPoints+" pts<br>"; } r.innerHTML=html; }
 function updateCharts() { var gradeCount={A:0,B:0,C:0,D:0,E:0}; var personScores=[]; for(var i=0;i<db.length;i++){ var l=db[i].history[db[i].history.length-1]; if(l){ gradeCount[l.grade]++; personScores.push({name:db[i].name,score:l.total}); } } var ctxPie=document.getElementById("pieChartGrade"); if(ctxPie){ if(pieChart) pieChart.destroy(); pieChart=new Chart(ctxPie,{type:'pie',data:{labels:['A','B','C','D','E'],datasets:[{data:[gradeCount.A,gradeCount.B,gradeCount.C,gradeCount.D,gradeCount.E],backgroundColor:['#22c55e','#3b82f6','#facc15','#ef4444','#b91c1c']}]},options:{responsive:true}});} var ctxBar=document.getElementById("barChartPerform"); if(ctxBar){ if(barChart) barChart.destroy(); var top5=personScores.sort(function(a,b){return b.score-a.score;}).slice(0,5); barChart=new Chart(ctxBar,{type:'bar',data:{labels:top5.map(function(p){return p.name.length>10?p.name.slice(0,8)+'..':p.name;}),datasets:[{label:'Skor',data:top5.map(function(p){return p.score;}),backgroundColor:'#38bdf8'}]},options:{responsive:true}});} }
-function saveEvaluation() { if(!nameInput.value.trim()) return showToast("Nama harus diisi!", true); if(!periodSelect.value) return showToast("Pilih periode evaluasi!", true); var scores=getAllScores(); var total=scores.total, maxPoints=scores.maxPoints; var percentage=(total/maxPoints)*100; var grade=percentage>=85?"A":percentage>=70?"B":percentage>=55?"C":percentage>=40?"D":"E"; var recommendation=document.getElementById("recommendationSelect").value; if(!recommendation) recommendation=percentage>=85?"TERBAIK":percentage>=70?"BAIK":percentage>=55?"CUKUP BAIK":percentage>=40?"BURUK":"BURUK SEKALI"; if(percentage<70){ var words=noteBox.value.trim().split(/\s+/).filter(function(w){return w.length>0;}); if(words.length<20) return showToast("Catatan minimal 20 kata!", true); } if(currentIndex===null){ db.push({name:nameInput.value.trim(),history:[]}); currentIndex=db.length-1; } var p=db[currentIndex]; p.name=nameInput.value.trim(); var existingIndex=-1; for(var i=0;i<p.history.length;i++){ if(p.history[i].period===periodSelect.value){ existingIndex=i; break; } } var newEntry={period:periodSelect.value,location:locationInput.value||"-",total:total,maxPoints:maxPoints,percentage:percentage.toFixed(1),grade:grade,recommendation:recommendation,note:noteBox.value||"-",origScores:scores.origScores,integrityScores:scores.integrityScores,leadershipScores:scores.leadershipScores,locked:false,docNumber:"EVAL-"+new Date().toISOString().slice(0,10).replace(/-/g,'')+"-"+Math.floor(Math.random()*10000),assessor:assessorInput.value||"Admin",lastUpdate:new Date().toISOString()}; if(existingIndex!==-1) p.history[existingIndex]=newEntry; else p.history.push(newEntry); saveDB(); backToList(); showToast("Evaluasi tersimpan!"); }
+function saveEvaluation() { if(!nameInput.value.trim()) return showToast("Nama harus diisi!", true); if(!periodSelect.value) return showToast("Pilih periode evaluasi!", true); var scores=getAllScores(); var total=scores.total, maxPoints=scores.maxPoints; var percentage=(total/maxPoints)*100; var grade=percentage>=85?"A":percentage>=70?"B":percentage>=55?"C":percentage>=40?"D":"E"; var recommendation=document.getElementById("recommendationSelect").value; if(!recommendation) recommendation=percentage>=85?"TERBAIK":percentage>=70?"BAIK":percentage>=55?"CUKUP BAIK":percentage>=40?"BURUK":"BURUK SEKALI"; if(percentage<70){ var words=noteBox.value.trim().split(/\s+/).filter(function(w){return w.length>0;}); if(words.length<20) return showToast("Catatan minimal 20 kata!", true); } if(currentIndex===null){ db.push({name:nameInput.value.trim(),history:[]}); currentIndex=db.length-1; } var p=db[currentIndex]; p.name=nameInput.value.trim(); var existingIndex=-1; for(var i=0;i<p.history.length;i++){ if(p.history[i].period===periodSelect.value){ existingIndex=i; break; } } var newEntry={period:periodSelect.value,location:locationInput.value||"-",total:total,maxPoints:maxPoints,percentage:percentage.toFixed(1),grade:grade,recommendation:recommendation,note:noteBox.value||"-",origScores:scores.origScores,integrityScores:scores.integrityScores,leadershipScores:scores.leadershipScores,locked:false,docNumber:"EVAL-"+new Date().toISOString().slice(0,10).replace(/-/g,'')+"-"+Math.floor(Math.random()*10000),assessor:assessorInput.value||"Admin",lastUpdate:new Date().toISOString()}; if(existingIndex!==-1) p.history[existingIndex]=newEntry; else p.history.push(newEntry); saveDB();
+
+var flatNilai = [];
+
+document.querySelectorAll("select[data-orig]").forEach(s=>{
+    flatNilai.push(s.value);
+});
+
+document.querySelectorAll("select[data-integrity]").forEach(s=>{
+    flatNilai.push(s.value);
+});
+
+document.querySelectorAll("select[data-leadership]").forEach(s=>{
+    flatNilai.push(s.value);
+});
+
+sendToSpreadsheet({
+
+    nama:p.name,
+
+    periode:periodSelect.value,
+
+    lokasi:locationInput.value || "-",
+
+    penilai:assessorInput.value || "-",
+
+    noDokumen:newEntry.docNumber,
+
+    nilai:flatNilai,
+
+    total:newEntry.total,
+
+    max:newEntry.maxPoints,
+
+    persentase:newEntry.percentage,
+
+    grade:newEntry.grade,
+
+    rekomendasi:newEntry.recommendation,
+
+    aiPsychology:
+        document.getElementById("aiPsychologyAnalysis")?.innerText || "-",
+
+    aiBehavior:
+        document.getElementById("aiBehaviorAnalysis")?.innerText || "-",
+
+    aiRisk:
+        document.getElementById("aiRiskAnalysis")?.innerText || "-",
+
+    aiFinal:
+        document.getElementById("aiFinalRecommendation")?.innerText || "-",
+
+    catatan:newEntry.note
+
+});
+
+backToList();
+
+showToast("Evaluasi tersimpan!");
+
+}
 function backToList() { document.getElementById("listView").classList.remove("hidden"); document.getElementById("detailView").classList.add("hidden"); renderList(); renderRank(); updateCharts(); }
 function deletePerson() { if(confirm("Yakin ingin menghapus personel ini?")){ db.splice(currentIndex,1); saveDB(); backToList(); showToast("Personel dihapus");} }
 function addPerson() { currentIndex=null; document.getElementById("listView").classList.add("hidden"); document.getElementById("detailView").classList.remove("hidden"); renderOriginalIndicators("C"); renderIntegrityIndicators("C"); renderLeadershipIndicators("C"); if(nameInput) nameInput.value=""; if(locationInput) locationInput.value=""; if(noteBox) noteBox.value=""; if(periodSelect) periodSelect.value=""; if(assessorInput) assessorInput.value=""; var recSelect=document.getElementById("recommendationSelect"); if(recSelect) recSelect.value=""; togglePeriodSpecificFields(); var aiBox=document.getElementById("aiIntelContainer"); if(aiBox) aiBox.classList.add("hidden"); }
@@ -330,6 +459,37 @@ async function exportSinglePDF(index){
         doc.setTextColor(180,180,180); doc.text(new Date().toLocaleDateString('id-ID'),w-rightMargin,29,{align:"right"});
         y=50;
         
+// MATRIX NILAI MANAGEMENT
+
+doc.setFillColor(20,30,50);
+doc.roundedRect(w-92,48,70,38,3,3,'F');
+
+var legendY = 56;
+
+function drawLegend(letter,desc,color,textColor){
+    doc.setFillColor(color[0],color[1],color[2]);
+    doc.rect(w-88,legendY,16,6,'F');
+
+    doc.setTextColor(textColor[0],textColor[1],textColor[2]);
+    doc.setFontSize(9);
+    doc.setFont("helvetica","bold");
+    doc.text(letter,w-80,legendY+4,{align:"center"});
+
+    doc.setFillColor(30,41,59);
+    doc.rect(w-72,legendY,44,6,'F');
+
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(7);
+    doc.text(desc,w-70,legendY+4);
+
+    legendY += 8;
+}
+
+drawLegend("A","SANGAT BAIK",[22,163,74],[255,255,255]);
+drawLegend("B","BAIK",[234,179,8],[0,0,0]);
+drawLegend("C","CUKUP",[56,189,248],[255,255,255]);
+drawLegend("D","BURUK",[239,68,68],[255,255,255]);
+
         // Data Personel
         doc.setFillColor(30,41,59); doc.rect(left-3,y-4,contentWidth+6,38,'F');
         doc.setTextColor(56,189,248); doc.setFontSize(11); doc.setFont("helvetica","bold");
@@ -535,6 +695,26 @@ async function pdfCurrent(){ if(currentIndex!==null) await exportSinglePDF(curre
 async function pdfAll(){ var toExport=[]; for(var i=0;i<db.length;i++){ if(db[i].history.length>0) toExport.push(db[i]); } if(toExport.length===0) return showToast("Tidak ada data",true); showToast("Menyiapkan "+toExport.length+" dokumen..."); for(var i=0;i<toExport.length;i++){ var idx=-1; for(var j=0;j<db.length;j++){ if(db[j].name===toExport[i].name){ idx=j; break; } } await exportSinglePDF(idx); await new Promise(function(r){setTimeout(r,500);}); } showToast("Semua PDF selesai!"); }
 function resetFilters(){ var s=document.getElementById("searchInput"); var p=document.getElementById("periodFilter"); var r=document.getElementById("recommendationFilter"); if(s) s.value=""; if(p) p.value=""; if(r) r.value=""; filterPersonel(); }
 function startClock(){ setInterval(function(){var c=document.getElementById("clock"); if(c) c.textContent=new Date().toLocaleTimeString('id-ID');},1000); }
+
+async function sendToSpreadsheet(data){
+
+    try{
+
+        await fetch(SCRIPT_URL,{
+            method:'POST',
+            body:JSON.stringify(data)
+        });
+
+        showToast("Spreadsheet updated!");
+
+    }catch(err){
+
+        console.error(err);
+
+        showToast("Spreadsheet gagal!",true);
+    }
+}
+
 
 window.addEventListener('DOMContentLoaded',function(){
     nameInput=document.getElementById("name"); locationInput=document.getElementById("location");
