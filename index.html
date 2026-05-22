@@ -504,6 +504,59 @@ drawLegend(matrixY+25,"D","BURUK",[239,68,68],[255,255,255]);
         doc.text("Penilai: "+(last.assessor||"-"),left,y); y+=5;
         doc.text("Nomor Dokumen: "+last.docNumber,left,y); y+=8;
         
+// TOTAL PENILAIAN BESAR
+
+var gradeText = "";
+var gradeColor = [56,189,248];
+var gradeTextColor = [255,255,255];
+
+if(last.grade === "A"){
+    gradeText = "A : SANGAT BAIK";
+    gradeColor = [22,163,74];
+}
+else if(last.grade === "B"){
+    gradeText = "B : BAIK";
+    gradeColor = [255,215,0];
+    gradeTextColor = [0,0,0];
+}
+else if(last.grade === "C"){
+    gradeText = "C : CUKUP";
+    gradeColor = [0,191,255];
+}
+else{
+    gradeText = "D : BURUK";
+    gradeColor = [255,0,0];
+}
+
+// BOX BESAR
+doc.setFillColor(
+    gradeColor[0],
+    gradeColor[1],
+    gradeColor[2]
+);
+
+doc.roundedRect(left,y,contentWidth,12,3,3,'F');
+
+// TEXT BESAR
+doc.setTextColor(
+    gradeTextColor[0],
+    gradeTextColor[1],
+    gradeTextColor[2]
+);
+
+doc.setFont("helvetica","bold");
+doc.setFontSize(18);
+
+doc.text(
+    "TOTAL PENILAIAN : " + gradeText,
+    w/2,
+    y+8,
+    {align:"center"}
+);
+
+y += 18;
+
+
         // Fungsi untuk print indikator
         
         
