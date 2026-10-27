@@ -253,7 +253,7 @@ canvas{touch-action:manipulation;max-width:100%;height:auto;}
                 <div style="font-weight:bold; margin-bottom:8px;">PENGATURAN EVALUASI</div>
                 <input type="text" id="customHeaderInput" placeholder="Nama Unit/Satuan" value="BADAN PERSONEL ELITE">
                 <div class="watermark-settings">
-                    <input type="text" id="watermarkText" placeholder="Teks Watermark" value="DOKUMEN RESMI">
+                    <input type="text" id="watermarkText" placeholder="Kosongkan jika tanpa watermark" value="">
                     <input type="number" id="watermarkOpacity" placeholder="Opacity" value="15" min="0" max="100" step="5" style="width:100px;">
                     <button onclick="saveWatermarkSettings()" style="width:auto; margin-top:0; padding:8px 15px;">Set Watermark</button>
                 </div>
@@ -490,7 +490,7 @@ var leadershipIndicators = [
 var db = JSON.parse(localStorage.getItem("dbEliteStrategic") || "[]");
 var currentIndex = null;
 var watermarkText = localStorage.getItem("watermarkText");
-if (watermarkText === null) watermarkText = "DOKUMEN RESMI";
+if (watermarkText === null || watermarkText.trim() === "DOKUMEN RESMI") { watermarkText = ""; localStorage.setItem("watermarkText", ""); }
 var savedWatermarkOpacity = localStorage.getItem("watermarkOpacity");
 var watermarkOpacity = savedWatermarkOpacity === null ? 15 : parseInt(savedWatermarkOpacity,10);
 if (!Number.isFinite(watermarkOpacity)) watermarkOpacity = 15;
@@ -561,7 +561,7 @@ function saveDB() { localStorage.setItem("dbEliteStrategic", JSON.stringify(db))
 function toggleTheme(theme) { document.body.className = theme === 'dark' ? '' : theme; localStorage.setItem("theme", theme); }
 function setThreshold() { var val=parseInt(document.getElementById("thresholdMin").value); if(!isNaN(val)) { localStorage.setItem("thresholdMin", val); showToast("Threshold "+val); } }
 function saveWatermarkSettings() { watermarkText=document.getElementById("watermarkText").value.trim(); var opacityInput=document.getElementById("watermarkOpacity").value.trim(); watermarkOpacity=opacityInput===""?0:parseInt(opacityInput,10); if(!Number.isFinite(watermarkOpacity)) watermarkOpacity=0; watermarkOpacity=Math.max(0,Math.min(100,watermarkOpacity)); localStorage.setItem("watermarkText",watermarkText); localStorage.setItem("watermarkOpacity",String(watermarkOpacity)); showToast(!watermarkText||watermarkOpacity===0?"Watermark dinonaktifkan":"Watermark disimpan: "+watermarkText); }
-function loadWatermarkSettings() { var wt=document.getElementById("watermarkText"); var wo=document.getElementById("watermarkOpacity"); if(wt) wt.value=watermarkText; if(wo) wo.value=watermarkOpacity; }
+function loadWatermarkSettings() { var wt=document.getElementById("watermarkText"); var wo=document.getElementById("watermarkOpacity"); if(wt) wt.value=watermarkText||""; if(wo) wo.value=watermarkOpacity; if(!String(watermarkText||"").trim()||Number(watermarkOpacity)<=0){ watermarkText=""; watermarkOpacity=0; localStorage.setItem("watermarkText",""); localStorage.setItem("watermarkOpacity","0"); if(wt) wt.value=""; if(wo) wo.value="0"; } }
 
 var DEFAULT_GRADE_LABELS = {A:"SANGAT BAIK",B:"BAIK",C:"CUKUP",D:"BURUK",E:"BURUK SEKALI"};
 var gradeLabels = (function(){
@@ -695,7 +695,7 @@ function showComparisonProgress(index){ var p=db[index]; if(!p||p.history.length
 function closeProgress(){ var modal=document.getElementById("progressModal"); if(modal) modal.classList.add("hidden"); if(window.progressChart) window.progressChart.destroy(); }
 function addSampleData() { var sampleScores=[]; for(var i=0;i<originalIndicators.length;i++){ var cat=[]; for(var j=0;j<originalIndicators[i].points.length;j++) cat.push("B"); sampleScores.push(cat); } var sampleIntegrity=[["B","B","C","B"]]; var sampleLeadership=[["C","C","B","C"]]; var sample={name:"Andika Pratama",history:[{period:"6 Bulan",location:"Jakarta",total:145,maxPoints:200,percentage:"72.5",grade:"B",recommendation:"BAIK",note:"Performa baik, disiplin dan bertanggung jawab. Menjaga integritas dengan baik. Patuh terhadap SOP dan memiliki komunikasi yang efektif dengan tim.",origScores:sampleScores,integrityScores:sampleIntegrity,leadershipScores:sampleLeadership,locked:false,docNumber:"DOC001",assessor:"Danru",lastUpdate:new Date().toISOString()}]}; db.push(sample); saveDB(); showToast("Contoh data ditambahkan"); }
 function exportExcel() { if(db.length===0) return showToast("Tidak ada data",true); var rows=[["Nama","Periode","Lokasi","Skor","Max","Persen","Grade","Rekomendasi","Penilai","Tanggal"]]; for(var i=0;i<db.length;i++){ var p=db[i]; for(var j=0;j<p.history.length;j++){ var h=p.history[j]; rows.push([p.name,h.period,h.location,h.total,h.maxPoints,h.percentage+"%",h.grade,h.recommendation,h.assessor,new Date(h.lastUpdate).toLocaleDateString('id-ID')]); } } var csv=""; for(var i=0;i<rows.length;i++){ var row=rows[i]; for(var j=0;j<row.length;j++){ csv+='"'+String(row[j]).replace(/"/g,'""')+'"'; if(j<row.length-1) csv+=','; } csv+='\n'; } var a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"})); a.download="Evaluasi_"+new Date().toISOString().slice(0,10)+".csv"; a.click(); URL.revokeObjectURL(a.href); showToast("CSV selesai!"); }
-function addWatermark(doc,pageCount){ var text=String(watermarkText||"").trim(); var opacity=Number(watermarkOpacity); if(!text||!Number.isFinite(opacity)||opacity<=0||pageCount<1) return; opacity=Math.min(100,Math.max(0,opacity))/100; for(var p=1;p<=pageCount;p++){ doc.setPage(p); doc.setFontSize(40); doc.setFont("helvetica","bold"); doc.setTextColor(180,180,180); doc.setGState(new doc.GState({opacity:opacity})); for(var x=-40;x<doc.internal.pageSize.width+40;x+=70){ for(var y=-40;y<doc.internal.pageSize.height+40;y+=55){ doc.text(text,x,y,{angle:45,align:"center"}); } } doc.setGState(new doc.GState({opacity:1})); } }
+function addWatermark(doc,pageCount){ var text=String(localStorage.getItem("watermarkText")||watermarkText||"").trim(); var savedOpacity=localStorage.getItem("watermarkOpacity"); var opacity=savedOpacity===null?Number(watermarkOpacity):Number(savedOpacity); if(!text||!Number.isFinite(opacity)||opacity<=0||pageCount<1) return; opacity=Math.min(100,Math.max(0,opacity))/100; for(var p=1;p<=pageCount;p++){ doc.setPage(p); doc.setFontSize(40); doc.setFont("helvetica","bold"); doc.setTextColor(180,180,180); doc.setGState(new doc.GState({opacity:opacity})); for(var x=-40;x<doc.internal.pageSize.width+40;x+=70){ for(var y=-40;y<doc.internal.pageSize.height+40;y+=55){ doc.text(text,x,y,{angle:45,align:"center"}); } } doc.setGState(new doc.GState({opacity:1})); } }
 
 async function exportSinglePDF(index){
     var p=db[index];
