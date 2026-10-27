@@ -339,8 +339,8 @@ canvas{touch-action:manipulation;max-width:100%;height:auto;}
                 <div class="person-photo-wrap">
                     <div class="person-photo-preview" id="personPhotoPreview">Foto personel</div>
                     <div style="flex:1;min-width:180px;">
-                        <label for="personPhotoInput" style="display:block;">Foto Personel yang Dinilai</label>
-                        <input id="personPhotoInput" type="file" accept="image/*" capture="environment" onchange="handlePersonPhoto(event)">
+                        <label for="personPhotoInput" style="display:block;">Pilih Foto Personel dari Galeri HP</label>
+                        <input id="personPhotoInput" type="file" accept="image/*" onchange="handlePersonPhoto(event)" aria-label="Pilih foto dari galeri HP atau kamera">
                         <div class="detail">Foto otomatis diperkecil agar penyimpanan perangkat tidak cepat penuh. Foto ditampilkan pada PDF.</div>
                         <button type="button" onclick="clearPersonPhoto()" style="background:#475569;color:#fff;">Hapus Foto</button>
                     </div>
