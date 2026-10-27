@@ -970,11 +970,19 @@ async function exportSinglePDF(index){
             doc.text(new Date().toLocaleDateString("id-ID"),pageW-right,pageH-7,{align:"right"});
         }
         addWatermark(doc,totalPages);
-        var pdfBlob=doc.output("blob");
-        var url=URL.createObjectURL(pdfBlob);
-        window.open(url,"_blank");
-        setTimeout(function(){URL.revokeObjectURL(url);},10000);
-        showToast("PDF selesai!");
+        // Nama file otomatis: Nama Personel - DD-MM-YYYY.pdf
+        var safeName=String(p.name||"Personel")
+            .replace(/[\\/:*?"<>|]/g," ")
+            .replace(/\s+/g," ")
+            .trim()
+            .replace(/[. ]+$/g,"");
+        if(!safeName) safeName="Personel";
+        var now=new Date();
+        var dateStamp=String(now.getDate()).padStart(2,"0")+"-"+
+            String(now.getMonth()+1).padStart(2,"0")+"-"+now.getFullYear();
+        var fileName=safeName+" - "+dateStamp+".pdf";
+        doc.save(fileName);
+        showToast("PDF diunduh: "+fileName);
     }catch(e){
         console.error(e);
         showToast("Gagal buat PDF",true);
