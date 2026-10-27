@@ -695,318 +695,290 @@ function exportExcel() { if(db.length===0) return showToast("Tidak ada data",tru
 function addWatermark(doc,pageCount){ var opacity=watermarkOpacity/100; var text=watermarkText; for(var p=1;p<=pageCount;p++){ doc.setPage(p); doc.setFontSize(40); doc.setFont("helvetica","bold"); doc.setTextColor(180,180,180); doc.setGState(new doc.GState({opacity:opacity})); for(var x=-40;x<doc.internal.pageSize.width+40;x+=70){ for(var y=-40;y<doc.internal.pageSize.height+40;y+=55){ doc.text(text,x,y,{angle:45,align:"center"}); } } doc.setGState(new doc.GState({opacity:1})); } }
 
 async function exportSinglePDF(index){
-    var p=db[index]; if(!p) return showToast("Data tidak ditemukan",true);
-    var last=p.history[p.history.length-1]; if(!last) return showToast("Belum ada evaluasi",true);
+    var p=db[index];
+    if(!p) return showToast("Data tidak ditemukan",true);
+    var last=p.history&&p.history[p.history.length-1];
+    if(!last) return showToast("Belum ada evaluasi",true);
     showToast("Menyiapkan PDF...");
     try{
         var {jsPDF}=window.jspdf;
         var doc=new jsPDF({unit:"mm",format:"a4",orientation:"portrait"});
-        var left=20, rightMargin=20, w=doc.internal.pageSize.width;
-        var contentWidth = w - left - rightMargin;
-        var y=25, pageNum=1;
-        
-        // Header
-        doc.setFillColor(2,6,23); doc.rect(0,0,w,40,'F');
-        doc.setTextColor(56,189,248); doc.setFontSize(14); doc.setFont("helvetica","bold");
-        var headerInput=document.getElementById("customHeaderInput");
-        doc.text(headerInput?headerInput.value:"BADAN PERSONEL ELITE",left,20);
-        doc.setFontSize(9); doc.setTextColor(255,255,255);
-        doc.text("LAPORAN EVALUASI MASA KERJA STRATEGIS",left,29);
-        doc.setTextColor(180,180,180); doc.text(new Date().toLocaleDateString('id-ID'),w-rightMargin,29,{align:"right"});
-        y=50;
-        
-// MATRIX NILAI MANAGEMENT
+        var pageW=doc.internal.pageSize.getWidth();
+        var pageH=doc.internal.pageSize.getHeight();
+        var left=16, right=16, contentW=pageW-left-right;
+        var top=43, bottom=17, y=top, pageNum=1;
 
-var matrixX = w - 82;
-var matrixY = 52;
+        function pageHeader(){
+            doc.setFillColor(2,6,23);
+            doc.rect(0,0,pageW,36,"F");
+            doc.setTextColor(56,189,248);
+            doc.setFont("helvetica","bold");
+            doc.setFontSize(13);
+            var unitName=(document.getElementById("customHeaderInput")||{}).value||"BADAN PERSONEL ELITE";
+            var unitLines=doc.splitTextToSize(unitName,contentW);
+            doc.text(unitLines.slice(0,2),left,12);
+            doc.setTextColor(255,255,255);
+            doc.setFont("helvetica","normal");
+            doc.setFontSize(8);
+            doc.text("LAPORAN EVALUASI MASA KERJA STRATEGIS",left,25);
+            doc.setTextColor(190,200,215);
+            doc.text(new Date().toLocaleDateString("id-ID"),pageW-right,25,{align:"right"});
+            var grades=[
+                ["A",String(gradeLabels.A||DEFAULT_GRADE_LABELS.A),[22,163,74]],
+                ["B",String(gradeLabels.B||DEFAULT_GRADE_LABELS.B),[234,179,8]],
+                ["C",String(gradeLabels.C||DEFAULT_GRADE_LABELS.C),[56,189,248]],
+                ["D",String(gradeLabels.D||DEFAULT_GRADE_LABELS.D),[239,68,68]],
+                ["E",String(gradeLabels.E||DEFAULT_GRADE_LABELS.E),[153,27,27]]
+            ];
+            var cellW=contentW/5;
+            grades.forEach(function(g,i){
+                var gx=left+i*cellW;
+                doc.setFillColor(g[2][0],g[2][1],g[2][2]);
+                doc.roundedRect(gx,29,cellW-1,5,0.8,0.8,"F");
+                doc.setFont("helvetica","bold");
+                doc.setFontSize(6.5);
+                doc.setTextColor(g[0]==="B"?0:255,g[0]==="B"?0:255,g[0]==="B"?0:255);
+                doc.text(g[0]+" "+g[1],gx+(cellW-1)/2,32.4,{align:"center",maxWidth:cellW-2});
+            });
+        }
+        function addPage(){
+            doc.addPage();
+            pageNum++;
+            pageHeader();
+            y=top;
+        }
+        function ensureSpace(height){
+            if(y+height>pageH-bottom) addPage();
+        }
+        function sectionHeader(title,color){
+            ensureSpace(10);
+            doc.setFillColor(20,30,50);
+            doc.roundedRect(left,y,contentW,8,1,1,"F");
+            doc.setFont("helvetica","bold");
+            doc.setFontSize(10);
+            doc.setTextColor(color[0],color[1],color[2]);
+            var lines=doc.splitTextToSize(title,contentW-6);
+            doc.text(lines.slice(0,2),left+3,y+5.3);
+            y+=10;
+        }
+        function drawWrapped(text,x,baseY,maxW,fontSize,lineHeight,color,bold){
+            doc.setFont("helvetica",bold?"bold":"normal");
+            doc.setFontSize(fontSize);
+            doc.setTextColor(color[0],color[1],color[2]);
+            var lines=doc.splitTextToSize(String(text==null?"":text),maxW);
+            if(!lines.length) lines=["-"];
+            doc.text(lines,x,baseY);
+            return lines.length*lineHeight;
+        }
 
-doc.setFillColor(10,15,30);
-doc.roundedRect(matrixX,matrixY,58,36,2,2,'F');
+        pageHeader();
 
-function drawLegend(y,label,text,bg,textColor){
-
-    // BOX NILAI
-    doc.setFillColor(bg[0],bg[1],bg[2]);
-    doc.rect(matrixX+3,y,10,5,'F');
-
-    // HURUF
-    doc.setTextColor(textColor[0],textColor[1],textColor[2]);
-    doc.setFont("helvetica","bold");
-    doc.setFontSize(8);
-    doc.text(label,matrixX+8,y+3.5,{align:"center"});
-
-    // TEXT
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(6.5);
-    doc.text(text,matrixX+16,y+3.5);
-}
-
-drawLegend(matrixY+3,"A",String(gradeLabels.A||DEFAULT_GRADE_LABELS.A).substring(0,16),[22,163,74],[255,255,255]);
-drawLegend(matrixY+9,"B",String(gradeLabels.B||DEFAULT_GRADE_LABELS.B).substring(0,16),[234,179,8],[0,0,0]);
-drawLegend(matrixY+15,"C",String(gradeLabels.C||DEFAULT_GRADE_LABELS.C).substring(0,16),[56,189,248],[255,255,255]);
-drawLegend(matrixY+21,"D",String(gradeLabels.D||DEFAULT_GRADE_LABELS.D).substring(0,16),[239,68,68],[255,255,255]);
-drawLegend(matrixY+27,"E",String(gradeLabels.E||DEFAULT_GRADE_LABELS.E).substring(0,16),[153,27,27],[255,255,255]);
-
-        // Data Personel — foto, identitas, lokasi, dan penanggung jawab
-        doc.setFillColor(30,41,59); doc.rect(left-3,y-4,contentWidth+6,42,'F');
-        doc.setTextColor(56,189,248); doc.setFontSize(11); doc.setFont("helvetica","bold");
-        doc.text("A. DATA PERSONEL",left,y);
-        var photoX=left+1, photoY=y+2, photoW=22, photoH=28;
+        // A. Data personel — seluruh isi berada di dalam kartu.
+        var personH=39;
+        ensureSpace(personH+4);
+        doc.setFillColor(30,41,59);
+        doc.roundedRect(left,y,contentW,personH,2,2,"F");
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(10);
+        doc.setTextColor(56,189,248);
+        doc.text("A. DATA PERSONEL",left+3,y+5.5);
+        var photoX=left+3, photoY=y+8, photoW=19, photoH=27;
         try{
             if(p.photo){
                 var fmt=p.photo.indexOf("image/png")!==-1?"PNG":"JPEG";
                 doc.addImage(p.photo,fmt,photoX,photoY,photoW,photoH,undefined,"FAST");
             }else{
-                doc.setDrawColor(100,116,139); doc.roundedRect(photoX,photoY,photoW,photoH,1,1,'S');
-                doc.setFontSize(6); doc.setTextColor(148,163,184); doc.text("TANPA FOTO",photoX+photoW/2,photoY+15,{align:"center"});
+                doc.setDrawColor(100,116,139);
+                doc.roundedRect(photoX,photoY,photoW,photoH,1,1,"S");
+                doc.setFontSize(6);
+                doc.setTextColor(180,190,205);
+                doc.text("TANPA FOTO",photoX+photoW/2,photoY+14,{align:"center"});
             }
         }catch(photoErr){ console.warn("Foto tidak dapat dimasukkan ke PDF:",photoErr); }
-        var infoX=left+29, infoY=y+7;
-        doc.setTextColor(220,220,220); doc.setFontSize(8.5); doc.setFont("helvetica","normal");
-        doc.text("Nama: "+(p.name||"-"),infoX,infoY,{maxWidth:72}); infoY+=4.5;
-        doc.text("NIK: "+(p.nik||last.nik||"-"),infoX,infoY,{maxWidth:72}); infoY+=4.5;
-        doc.text("LOKASI: "+(last.location||"-"),infoX,infoY,{maxWidth:72}); infoY+=4.5;
-        doc.text("Periode: "+(last.period||"-"),infoX,infoY,{maxWidth:72}); infoY+=4.5;
-        doc.text("Penanggung Jawab Evaluasi: "+(last.assessor||"-"),infoX,infoY,{maxWidth:72}); infoY+=4.5;
-        doc.text("Nomor Dokumen: "+(last.docNumber||"-"),infoX,infoY,{maxWidth:72});
-        y+=48;
-        
-// TOTAL PENILAIAN BESAR
+        var infoX=left+27, infoY=y+11, infoW=contentW-31;
+        var infoItems=[
+            "Nama: "+(p.name||"-"),
+            "NIK: "+(p.nik||last.nik||"-"),
+            "Lokasi: "+(last.location||"-"),
+            "Periode: "+(last.period||"-"),
+            "Penanggung Jawab Evaluasi: "+(last.assessor||"-"),
+            "Nomor Dokumen: "+(last.docNumber||"-")
+        ];
+        infoItems.forEach(function(item){
+            var h=drawWrapped(item,infoX,infoY,infoW,8,3.7,[230,235,242],false);
+            infoY+=Math.max(3.7,h);
+        });
+        y+=personH+5;
 
-var gradeText = "";
-var gradeColor = [56,189,248];
-var gradeTextColor = [255,255,255];
+        // Ringkasan nilai.
+        var palette={A:{c:[22,163,74],t:[255,255,255]},B:{c:[234,179,8],t:[0,0,0]},C:{c:[56,189,248],t:[0,0,0]},D:{c:[239,68,68],t:[255,255,255]},E:{c:[153,27,27],t:[255,255,255]}};
+        var selectedGrade=palette[last.grade]?last.grade:"E";
+        var gradeName=String(gradeLabels[selectedGrade]||DEFAULT_GRADE_LABELS[selectedGrade]);
+        var totalText="TOTAL PENILAIAN: "+selectedGrade+" - "+gradeName;
+        ensureSpace(14);
+        doc.setFillColor(palette[selectedGrade].c[0],palette[selectedGrade].c[1],palette[selectedGrade].c[2]);
+        doc.roundedRect(left,y,contentW,11,2,2,"F");
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(12);
+        doc.setTextColor(palette[selectedGrade].t[0],palette[selectedGrade].t[1],palette[selectedGrade].t[2]);
+        doc.text(totalText,pageW/2,y+7.2,{align:"center",maxWidth:contentW-8});
+        y+=15;
 
-var gradePalette = {
-    A:{color:[22,163,74],text:[255,255,255]},
-    B:{color:[234,179,8],text:[0,0,0]},
-    C:{color:[56,189,248],text:[255,255,255]},
-    D:{color:[239,68,68],text:[255,255,255]},
-    E:{color:[153,27,27],text:[255,255,255]}
-};
-var selectedGrade = gradePalette[last.grade] ? last.grade : "E";
-gradeText = selectedGrade + " : " + String(gradeLabels[selectedGrade] || DEFAULT_GRADE_LABELS[selectedGrade]);
-gradeColor = gradePalette[selectedGrade].color;
-gradeTextColor = gradePalette[selectedGrade].text;
-
-// BOX BESAR
-doc.setFillColor(
-    gradeColor[0],
-    gradeColor[1],
-    gradeColor[2]
-);
-
-doc.roundedRect(left,y,contentWidth,12,3,3,'F');
-
-// TEXT BESAR
-doc.setTextColor(
-    gradeTextColor[0],
-    gradeTextColor[1],
-    gradeTextColor[2]
-);
-
-doc.setFont("helvetica","bold");
-doc.setFontSize(18);
-
-doc.text(
-    "TOTAL PENILAIAN : " + gradeText,
-    w/2,
-    y+8,
-    {align:"center"}
-);
-
-y += 18;
-
-
-        // Fungsi untuk print indikator
-        
-        
-        function printIndicators(categoryName, indicatorsArray, scoresArray, colorR, colorG, colorB, yPos){
-            var currentY = yPos;
-
-            for(var catIdx=0;catIdx<indicatorsArray.length;catIdx++){
-                var cat = indicatorsArray[catIdx];
-
-                // Page break
-                if(currentY > 260){
-                    doc.addPage(); currentY = 25; pageNum++;
-                }
-
-                // Category Header (tight fit)
-                doc.setFont("helvetica","bold");
-                doc.setFontSize(10);
-
-                var headerHeight = 7;
-                doc.setFillColor(20,30,50);
-                doc.rect(left-2, currentY-4, contentWidth+4, headerHeight, 'F');
-
-                doc.setTextColor(colorR,colorG,colorB);
-                doc.text(categoryName, left, currentY);
-                currentY += headerHeight + 1;
-
-                for(var pointIdx=0; pointIdx<cat.points.length; pointIdx++){
-                    var point = cat.points[pointIdx];
-                    var nilai = "C";
-
-                    if(scoresArray && scoresArray[catIdx] && scoresArray[catIdx][pointIdx]){
-                        nilai = scoresArray[catIdx][pointIdx];
-                    }
-
-                    // Capture start Y (for vertical alignment)
-                    var startY = currentY;
-
-                    // Bullet dot
-                    doc.setFillColor(colorR,colorG,colorB);
-                    doc.circle(left+1, currentY-1.5, 0.8, 'F');
-
-                    // Title
+        // Cetak indikator dengan page-break per item, bukan di tengah teks.
+        function printIndicators(categoryName,indicatorsArray,scoresArray,color){
+            if(!Array.isArray(indicatorsArray)||!indicatorsArray.length) return;
+            sectionHeader(categoryName,color);
+            for(var ci=0;ci<indicatorsArray.length;ci++){
+                var cat=indicatorsArray[ci]||{};
+                var points=Array.isArray(cat.points)?cat.points:[];
+                for(var pi=0;pi<points.length;pi++){
+                    var point=points[pi]||{};
+                    var score=(scoresArray&&scoresArray[ci]&&scoresArray[ci][pi])||"C";
+                    var titleLines=doc.splitTextToSize(String(point.title||"-"),contentW-22);
+                    var detailLines=doc.splitTextToSize(String(point.detail||""),contentW-25);
+                    var rowH=Math.max(9,titleLines.length*3.8+detailLines.length*3.5+3);
+                    ensureSpace(rowH+1);
+                    doc.setFillColor(17,24,39);
+                    doc.roundedRect(left,y,contentW,rowH,1,1,"F");
+                    doc.setFillColor(color[0],color[1],color[2]);
+                    doc.circle(left+3,y+4,0.9,"F");
                     doc.setFont("helvetica","bold");
                     doc.setFontSize(8.5);
-                    doc.setTextColor(230,230,230);
-
-                    var titleLines = doc.splitTextToSize(point.title, contentWidth-25);
-                    for(var t=0; t<titleLines.length; t++){
-                        if(currentY > 275){ doc.addPage(); currentY=25; pageNum++; }
-                        doc.text(titleLines[t], left+4, currentY);
-                        currentY += 3.8;
+                    doc.setTextColor(235,239,245);
+                    doc.text(titleLines,left+6,y+4.5);
+                    var detailY=y+4.5+titleLines.length*3.8;
+                    if(detailLines.length){
+                        doc.setFont("helvetica","normal");
+                        doc.setFontSize(7.5);
+                        doc.setTextColor(165,175,190);
+                        doc.text(detailLines,left+6,detailY);
                     }
-
-                    // Detail
-                    doc.setFont("helvetica","normal");
-                    doc.setTextColor(140,140,140);
-
-                    var detailLines = doc.splitTextToSize(point.detail, contentWidth-30);
-                    for(var d=0; d<detailLines.length; d++){
-                        if(currentY > 275){ doc.addPage(); currentY=25; pageNum++; }
-                        doc.text(detailLines[d], left+6, currentY);
-                        currentY += 3.4;
-                    }
-
-                    // Calculate middle Y for score alignment
-                    var endY = currentY;
-                    var midY = (startY + endY) / 2;
-
-                    // Score (perfect vertical alignment)
                     doc.setFont("helvetica","bold");
                     doc.setFontSize(10);
-                    doc.setTextColor(colorR,colorG,colorB);
-                    doc.text(nilai, w-rightMargin-2, midY, {align:"right"});
-
-                    currentY += 2.5; // spacing antar bullet
+                    doc.setTextColor(color[0],color[1],color[2]);
+                    doc.text(String(score),left+contentW-3,y+rowH/2+1,{align:"right"});
+                    y+=rowH+1.5;
                 }
-
-                currentY += 5; // spacing antar kategori
             }
+            y+=2;
+        }
+        printIndicators("B. INDIKATOR PENILAIAN",originalIndicators,last.origScores,[56,189,248]);
+        if(last.integrityScores&&last.integrityScores[0]&&last.integrityScores[0].length)
+            printIndicators("C. LOYALITAS DAN INTEGRITAS",integrityIndicators,last.integrityScores,[245,158,11]);
+        if(last.leadershipScores&&last.leadershipScores[0]&&last.leadershipScores[0].length)
+            printIndicators("D. KEPEMIMPINAN DAN POTENSI PROMOSI",leadershipIndicators,last.leadershipScores,[56,189,248]);
 
-            return currentY;
+        // E. Catatan evaluasi — tinggi background mengikuti jumlah baris.
+        if(last.note&&last.note.trim()&&last.note!=="-"){
+            var noteLines=doc.splitTextToSize(last.note,contentW-8);
+            var noteH=10+noteLines.length*4.2;
+            ensureSpace(noteH+2);
+            doc.setFillColor(30,41,59);
+            doc.roundedRect(left,y,contentW,noteH,2,2,"F");
+            doc.setFont("helvetica","bold");
+            doc.setFontSize(10);
+            doc.setTextColor(56,189,248);
+            doc.text("E. CATATAN EVALUASI",left+3,y+5.5);
+            doc.setFont("helvetica","normal");
+            doc.setFontSize(8.5);
+            doc.setTextColor(225,230,238);
+            doc.text(noteLines,left+3,y+10);
+            y+=noteH+4;
         }
 
+        // F. Rekomendasi — wrap otomatis dan background tidak dipotong.
+        var recMap={
+            "TERBAIK":"TERBAIK - Layak Promosi / Reward",
+            "BAIK":"BAIK - Performa Memuaskan",
+            "CUKUP BAIK":"CUKUP BAIK - Perlu Pembinaan",
+            "BURUK":"BURUK - Surat Peringatan",
+            "BURUK SEKALI":"BURUK SEKALI - Skorsing / PHK"
+        };
+        var recText=recMap[last.recommendation]||String(last.recommendation||"Belum ditentukan");
+        var recLines=doc.splitTextToSize(recText,contentW-8);
+        var recH=10+recLines.length*5;
+        ensureSpace(recH+2);
+        doc.setFillColor(30,41,59);
+        doc.roundedRect(left,y,contentW,recH,2,2,"F");
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(10);
+        doc.setTextColor(56,189,248);
+        doc.text("F. STATUS REKOMENDASI",left+3,y+5.5);
+        doc.setFontSize(9);
+        doc.setTextColor(240,243,248);
+        doc.text(recLines,left+3,y+10);
+        y+=recH+4;
 
-        
-        // Original Indicators
-        y = printIndicators("B. INDIKATOR PENILAIAN", originalIndicators, last.origScores, 56, 189, 248, y);
-        
-        // Integrity Indicators
-        if(last.integrityScores && last.integrityScores[0] && last.integrityScores[0].length){
-            y = printIndicators("C. LOYALITAS DAN INTEGRITAS", integrityIndicators, last.integrityScores, 245, 158, 11, y);
-        }
-        
-        // Leadership Indicators
-        if(last.leadershipScores && last.leadershipScores[0] && last.leadershipScores[0].length){
-            y = printIndicators("D. KEPEMIMPINAN DAN POTENSI PROMOSI", leadershipIndicators, last.leadershipScores, 56, 189, 248, y);
-        }
-        
-        // Catatan
-        if(last.note && last.note.trim() && last.note!=="-"){
-            if(y > 250){ doc.addPage(); y=25; pageNum++; }
-            doc.setFillColor(30,41,59); doc.rect(left-2,y-2,contentWidth+4,7,'F');
-            doc.setTextColor(56,189,248); doc.setFontSize(10); doc.setFont("helvetica","bold");
-            doc.text("E. CATATAN EVALUASI",left,y); y+=5;
-            doc.setTextColor(200,200,200); doc.setFontSize(8); doc.setFont("helvetica","normal");
-            var noteLines=doc.splitTextToSize(last.note,contentWidth);
-            for(var d=0;d<noteLines.length;d++){
-                if(y > 275){ doc.addPage(); y=25; pageNum++; }
-                doc.text(noteLines[d],left,y); y+=4;
-            }
-            y+=4;
-        }
-        
-        // Rekomendasi
-        if(y > 260){ doc.addPage(); y=25; pageNum++; }
-        doc.setFillColor(30,41,59); doc.rect(left-2,y-2,contentWidth+4,12,'F');
-        doc.setTextColor(56,189,248); doc.setFontSize(10); doc.setFont("helvetica","bold");
-        doc.text("F. STATUS REKOMENDASI",left,y); y+=5;
-        var recText="";
-        if(last.recommendation=="TERBAIK") recText="TERBAIK - Layak Promosi / Reward";
-        else if(last.recommendation=="BAIK") recText="BAIK - Performa Memuaskan";
-        else if(last.recommendation=="CUKUP BAIK") recText="CUKUP BAIK - Perlu Pembinaan";
-        else if(last.recommendation=="BURUK") recText="BURUK - Surat Peringatan";
-        else recText="BURUK SEKALI - Skorsing / PHK";
-        doc.setTextColor(220,220,220); doc.setFontSize(9);
-        doc.text(recText,left,y); y+=8;
-        
-        // AI Intelligence
-        var percentage=(last.total/last.maxPoints)*100;
+        // G. AI report: layout vertikal agar label dan nilai tidak bertumpuk.
+        var percentage=last.maxPoints?(last.total/last.maxPoints)*100:0;
         var perfCat=percentage>=85?"TERBAIK":percentage>=70?"BAIK":percentage>=55?"CUKUP":percentage>=40?"BURUK":"BURUK SEKALI";
-        var psych="Normal - Stabil";
-        if(percentage<40) psych="Kritis - Perlu intervensi segera";
-        else if(percentage<55) psych="Perbaikan signifikan diperlukan";
-        else if(percentage>=85) psych="Role Model - Motivasi tinggi";
+        var psych=percentage<40?"Kritis - Perlu intervensi segera":percentage<55?"Perbaikan signifikan diperlukan":percentage>=85?"Role Model - Motivasi tinggi":"Normal - Stabil";
         var behav=percentage>=70?"Memenuhi standar perilaku":percentage>=55?"Perlu pembinaan perilaku":"Intervensi perilaku diperlukan";
         var risk=percentage>=70?"Risiko rendah":percentage>=55?"Risiko sedang":"Risiko tinggi";
-        
-        if(y+70 > doc.internal.pageSize.height){ doc.addPage(); y=25; pageNum++; }
-        doc.setFillColor(30,41,59); doc.rect(left-2,y-2,contentWidth+4,7,'F');
-        doc.setTextColor(245,158,11); doc.setFontSize(10); doc.setFont("helvetica","bold");
-        doc.text("G. AI PERSONNEL PERFORMANCE AND BEHAVIORAL INTELLIGENCE",left,y); y+=5;
-        
-        doc.setFillColor(17,24,39); doc.rect(left-1,y-1,contentWidth+2,58,'F');
-        doc.setTextColor(245,158,11); doc.setFontSize(9); doc.setFont("helvetica","bold");
-        doc.text("AI ANALYSIS REPORT",left,y); y+=5;
-        
-        doc.setTextColor(56,189,248); doc.setFontSize(8); doc.setFont("helvetica","bold");
-        doc.text("Performance Category:",left+2,y); doc.setTextColor(220,220,220); doc.setFont("helvetica","normal");
-        doc.text(perfCat,left+45,y); doc.setTextColor(56,189,248); doc.text(percentage.toFixed(1)+"%",w-rightMargin-2,y,{align:"right"}); y+=5;
-        
-        doc.setTextColor(56,189,248); doc.setFont("helvetica","bold");
-        doc.text("Psychology Analysis:",left+2,y); doc.setTextColor(220,220,220); doc.setFont("helvetica","normal");
-        doc.text(psych,left+45,y); y+=5;
-        
-        doc.setTextColor(56,189,248); doc.setFont("helvetica","bold");
-        doc.text("Behavioral Assessment:",left+2,y); doc.setTextColor(220,220,220); doc.setFont("helvetica","normal");
-        doc.text(behav,left+48,y); y+=5;
-        
-        doc.setTextColor(56,189,248); doc.setFont("helvetica","bold");
-        doc.text("Risk and Security:",left+2,y); doc.setTextColor(220,220,220); doc.setFont("helvetica","normal");
-        doc.text(risk,left+42,y); y+=8;
-        
-        doc.setFillColor(2,6,23); doc.rect(left-1,y-1,contentWidth+2,13,'F');
-        doc.setTextColor(100,100,100); doc.setFontSize(7);
-        doc.text("Statistical Data",left+2,y); y+=4;
-        doc.setTextColor(220,220,220); doc.setFontSize(8);
-        doc.text("Skor: "+last.total,left+4,y); doc.text("Max: "+last.maxPoints,w-55,y); doc.text("Persen: "+percentage.toFixed(1)+"%",w-rightMargin-2,y,{align:"right"}); y+=6;
-        
-        doc.setFillColor(20,30,50); doc.rect(left-1,y-1,contentWidth+2,12,'F');
-        doc.setTextColor(245,158,11); doc.setFontSize(8); doc.setFont("helvetica","bold");
-        doc.text("Keputusan Danru:",left+2,y); y+=4;
-        doc.setTextColor(56,189,248); doc.setFontSize(9);
-        doc.text(last.recommendation,left+4,y); y+=4;
-        doc.setTextColor(130,130,150); doc.setFontSize(6);
-        doc.text("Basis: Skor "+last.total+"/"+last.maxPoints+" ("+percentage.toFixed(1)+"%)",left+4,y); y+=5;
-        
-        // Footer
-        for(var i=1;i<=pageNum;i++){ 
-            doc.setPage(i); 
-            doc.setTextColor(100,100,100); 
-            doc.setFontSize(7); 
-            doc.text("Halaman "+i+" dari "+pageNum,w/2,doc.internal.pageSize.height-8,{align:"center"}); 
-            doc.text("Dokumen: "+last.docNumber,left,doc.internal.pageSize.height-8); 
-            doc.text(new Date().toLocaleString('id-ID'),w-rightMargin,doc.internal.pageSize.height-8,{align:"right"}); 
+        var aiRows=[
+            ["Performance Category",perfCat+" ("+percentage.toFixed(1)+"%)"],
+            ["Psychology Analysis",psych],
+            ["Behavioral Assessment",behav],
+            ["Risk and Security",risk],
+            ["Statistical Data","Skor "+last.total+" / "+last.maxPoints+" ("+percentage.toFixed(1)+"%)"],
+            ["Keputusan Danru",recText]
+        ];
+        var aiHeights=aiRows.map(function(row){
+            var valueLines=doc.splitTextToSize(String(row[1]),contentW-12);
+            return 8+Math.max(1,valueLines.length)*4;
+        });
+        var aiTitleLines=doc.splitTextToSize("G. AI PERSONNEL PERFORMANCE AND BEHAVIORAL INTELLIGENCE",contentW-8);
+        var aiTotalH=8+aiTitleLines.length*4.5+8+aiHeights.reduce(function(a,b){return a+b;},0)+3;
+        ensureSpace(aiTotalH+2);
+        doc.setFillColor(30,41,59);
+        doc.roundedRect(left,y,contentW,aiTotalH,2,2,"F");
+        doc.setFont("helvetica","bold");
+        doc.setFontSize(10);
+        doc.setTextColor(245,158,11);
+        doc.text(aiTitleLines,left+3,y+5.5);
+        var aiY=y+5.5+aiTitleLines.length*4.5+3;
+        doc.setFillColor(17,24,39);
+        doc.roundedRect(left+2,aiY,contentW-4,aiTotalH-(aiY-y)-2,1,1,"F");
+        aiY+=4;
+        aiRows.forEach(function(row,i){
+            var valueLines=doc.splitTextToSize(String(row[1]),contentW-12);
+            doc.setFont("helvetica","bold");
+            doc.setFontSize(7.5);
+            doc.setTextColor(56,189,248);
+            doc.text(row[0],left+5,aiY);
+            aiY+=3.5;
+            doc.setFont("helvetica","normal");
+            doc.setFontSize(8);
+            doc.setTextColor(230,234,241);
+            doc.text(valueLines,left+5,aiY);
+            aiY+=Math.max(1,valueLines.length)*4+2;
+        });
+        y+=aiTotalH+4;
+
+        // Footer dan watermark setelah semua page-break selesai.
+        var totalPages=doc.internal.getNumberOfPages();
+        for(var pg=1;pg<=totalPages;pg++){
+            doc.setPage(pg);
+            doc.setDrawColor(80,95,115);
+            doc.setLineWidth(0.2);
+            doc.line(left,pageH-13,pageW-right,pageH-13);
+            doc.setFont("helvetica","normal");
+            doc.setFontSize(7);
+            doc.setTextColor(120,130,145);
+            doc.text("Dokumen: "+(last.docNumber||"-"),left,pageH-7);
+            doc.text("Halaman "+pg+" dari "+totalPages,pageW/2,pageH-7,{align:"center"});
+            doc.text(new Date().toLocaleDateString("id-ID"),pageW-right,pageH-7,{align:"right"});
         }
-        addWatermark(doc,pageNum);
-        var pdfBlob=doc.output('blob'); var url=URL.createObjectURL(pdfBlob); window.open(url,'_blank'); setTimeout(function(){URL.revokeObjectURL(url);},2000);
+        addWatermark(doc,totalPages);
+        var pdfBlob=doc.output("blob");
+        var url=URL.createObjectURL(pdfBlob);
+        window.open(url,"_blank");
+        setTimeout(function(){URL.revokeObjectURL(url);},10000);
         showToast("PDF selesai!");
-    }catch(e){console.error(e); showToast("Gagal buat PDF",true);}
+    }catch(e){
+        console.error(e);
+        showToast("Gagal buat PDF",true);
+    }
 }
 async function pdfCurrent(){ if(currentIndex!==null) await exportSinglePDF(currentIndex); else showToast("Pilih personel",true); }
 async function pdfAll(){ var toExport=[]; for(var i=0;i<db.length;i++){ if(db[i].history.length>0) toExport.push(db[i]); } if(toExport.length===0) return showToast("Tidak ada data",true); showToast("Menyiapkan "+toExport.length+" dokumen..."); for(var i=0;i<toExport.length;i++){ var idx=-1; for(var j=0;j<db.length;j++){ if(db[j].name===toExport[i].name){ idx=j; break; } } await exportSinglePDF(idx); await new Promise(function(r){setTimeout(r,500);}); } showToast("Semua PDF selesai!"); }
